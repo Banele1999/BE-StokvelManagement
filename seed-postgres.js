@@ -4,110 +4,63 @@ const bcrypt = require('bcryptjs');
 
 const db = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: false
+    ssl: process.env.DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false }
 });
 
 async function seed() {
-    const password = 'password123';
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const now = new Date();
-    
-    console.log("--- Initializing PostgreSQL Seed ---");
-
+    console.log('Starting seed process...');
     try {
-        // 1. Clean Database
-        console.log('Cleaning database...');
-        await db.query('DELETE FROM notifications');
-        await db.query('DELETE FROM payments');
-        await db.query('DELETE FROM group_members');
-        await db.query('DELETE FROM stokvel_groups');
-        await db.query('DELETE FROM users');
+        const hashedPassword = await bcrypt.hash('password123', 10);
+        const date = new Date().toISOString();
 
-        // 2. Create TestGroup
-        console.log('Creating test group...');
+        // 1. Create Tables (just in case)
+        console.log('Ensuring tables exist...');
+        await db.query(`CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name TEXT, email TEXT UNIQUE, password TEXT, phone TEXT, "idNumber" TEXT, "monthlyContribution" DECIMAL, "monthlyTarget" DECIMAL DEFAULT 0, "yearlyTarget" DECIMAL DEFAULT 0, "isSuperAdmin" INTEGER DEFAULT 0, "createdAt" TEXT)`);
+        await db.query(`CREATE TABLE IF NOT EXISTS stokvel_groups (id SERIAL PRIMARY KEY, name TEXT, description TEXT, "groupBalance" DECIMAL DEFAULT 0, "monthlyTarget" DECIMAL DEFAULT 0, "yearlyTarget" DECIMAL DEFAULT 0, "createdAt" TEXT)`);
+        await db.query(`CREATE TABLE IF NOT EXISTS group_members ("groupId" INTEGER, "userId" INTEGER, role TEXT DEFAULT 'Member', PRIMARY KEY("groupId", "userId"), FOREIGN KEY("groupId") REFERENCES stokvel_groups(id), FOREIGN KEY("userId") REFERENCES users(id))`);
+        await db.query(`CREATE TABLE IF NOT EXISTS payments (id SERIAL PRIMARY KEY, "userId" INTEGER, "groupId" INTEGER, amount DECIMAL, method TEXT, date TEXT, status TEXT DEFAULT 'pending', reference TEXT, "createdAt" TEXT)`);
+        
+        // 2. Clear Existing Data (Optional - be careful in production!)
+        // console.log('Clearing old data...');
+        // await db.query('TRUNCATE users, stokvel_groups, group_members, payments RESTART IDENTITY CASCADE');
+
+        // 3. Insert Admin User
+        console.log('Inserting test user...');
+        const userRes = await db.query(
+            'INSERT INTO users (name, email, password, phone, "monthlyContribution", "createdAt") VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (email) DO NOTHING RETURNING id',
+            ['Test Admin', 'admin@example.com', hashedPassword, '0812345678', 500, date]
+        );
+        
+        if (userRes.rows.length === 0) {
+            console.log('User already exists, skipping user creation.');
+            return;
+        }
+        
+        const userId = userRes.rows[0].id;
+
+        // 4. Insert Group
+        console.log('Inserting test group...');
         const groupRes = await db.query(
-            'INSERT INTO stokvel_groups (name, description, "groupBalance", "monthlyTarget", "yearlyTarget", "createdAt") VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
-            ['TestGroup', 'Official Testing Group', 0, 10000, 120000, now.toISOString()]
+            'INSERT INTO stokvel_groups (name, description, "groupBalance", "monthlyTarget", "yearlyTarget") VALUES ($1, $2, $3, $4, $5) RETURNING id',
+            ['Alpha Stokvel', 'Our primary testing group', 1000, 5000, 60000]
         );
         const groupId = groupRes.rows[0].id;
 
-        // 3. Create 10 Members
-        console.log('Creating test members...');
-        const memberConfigs = [
-            { name: 'TestAdmin', email: 'testadmin@test.com', role: 'Admin', contrib: 1000 },
-            { name: 'MusaAdmin', email: 'musaadmin@test.com', role: 'Admin', contrib: 1000 },
-            { name: 'MusaTest', email: 'musatest@test.com', role: 'Member', contrib: 1000 },
-            { name: 'John Test', email: 'john@test.com', role: 'Member', contrib: 1000 },
-            { name: 'Sarah Test', email: 'sarah@test.com', role: 'Member', contrib: 1000 },
-            { name: 'David Test', email: 'david@test.com', role: 'Member', contrib: 1000 },
-            { name: 'Emma Test', email: 'emma@test.com', role: 'Member', contrib: 1000 },
-            { name: 'Peter Test', email: 'peter@test.com', role: 'Member', contrib: 1000 },
-            { name: 'Linda Test', email: 'linda@test.com', role: 'Member', contrib: 1000 },
-            { name: 'Banele Test', email: 'banele@test.com', role: 'Member', contrib: 1000 },
-        ];
-
-        const userIds = [];
-        for (const m of memberConfigs) {
-            const joinDate = '2025-01-01T08:00:00.000Z';
-            const userRes = await db.query(
-                'INSERT INTO users (name, email, password, phone, "monthlyContribution", "monthlyTarget", "yearlyTarget", "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
-                [m.name, m.email, hashedPassword, '0123456789', m.contrib, m.contrib, m.contrib * 12, joinDate]
-            );
-            const userId = userRes.rows[0].id;
-            userIds.push(userId);
-            
-            await db.query(
-                'INSERT INTO group_members ("groupId", "userId", role) VALUES ($1, $2, $3)',
-                [groupId, userId, m.role]
-            );
-        }
-
-        // 4. Generate Payments
-        console.log('Generating payment history...');
-        let groupTotalVerified = 0;
-        const startDate = new Date(2025, 0, 1);
-        const endDate = new Date();
-
-        for (let d = new Date(startDate); d <= endDate; d.setMonth(d.getMonth() + 1)) {
-            const monthStr = d.toISOString().slice(0, 7);
-            
-            for (let i = 0; i < memberConfigs.length; i++) {
-                const m = memberConfigs[i];
-                const isCurrentMonth = d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-                const status = isCurrentMonth ? 'pending' : 'verified';
-                const amount = m.contrib;
-                const payDate = d.toISOString();
-                const ref = `Contrib-${monthStr}`;
-
-                await db.query(
-                    'INSERT INTO payments ("userId", "groupId", amount, method, date, status, reference, "createdAt") VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-                    [userIds[i], groupId, amount, 'EFT', payDate, status, ref, now.toISOString()]
-                );
-                
-                if (status === 'verified') {
-                    groupTotalVerified += amount;
-                }
-            }
-        }
-
-        // 5. Update Group Balance
-        await db.query('UPDATE stokvel_groups SET "groupBalance" = $1 WHERE id = $2', [groupTotalVerified, groupId]);
-
-        // 6. Create notifications
+        // 5. Link User to Group as Admin
         await db.query(
-            'INSERT INTO notifications ("userId", title, message, type, "isRead", "createdAt") VALUES ($1, $2, $3, $4, $5, $6)',
-            [userIds[0], 'Welcome', 'TestGroup environment is ready for testing.', 'success', 0, now.toISOString()]
-        );
-        await db.query(
-            'INSERT INTO notifications ("userId", title, message, type, "isRead", "createdAt") VALUES ($1, $2, $3, $4, $5, $6)',
-            [userIds[1], 'Welcome', 'TestGroup environment is ready for testing.', 'success', 0, now.toISOString()]
+            'INSERT INTO group_members ("groupId", "userId", role) VALUES ($1, $2, $3)',
+            [groupId, userId, 'Admin']
         );
 
-        console.log('--- Seeding Complete: TestGroup Loaded ---');
-        console.log('Logins (Password: password123):');
-        console.log('- testadmin@test.com (Admin)');
-        console.log('- musaadmin@test.com (Admin)');
-        console.log('- musatest@test.com (Member)');
+        // 6. Insert a Payment
+        await db.query(
+            'INSERT INTO payments ("userId", "groupId", amount, method, date, reference, status) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+            [userId, groupId, 500, 'EFT', date, 'SEED-PAY-001', 'verified']
+        );
+
+        console.log('Seeding complete! You can now log in with:');
+        console.log('Email: admin@example.com');
+        console.log('Password: password123');
 
     } catch (err) {
         console.error('Seeding Error:', err);

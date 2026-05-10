@@ -6,21 +6,25 @@ const db = new Pool({
     ssl: false
 });
 
-async function promoteSuperAdmin(email) {
+async function promote(email) {
+    console.log(`Promoting ${email} to Super Admin...`);
     try {
-        const res = await db.query('UPDATE users SET "isSuperAdmin" = 1 WHERE email = $1 RETURNING *', [email]);
+        const res = await db.query(
+            'UPDATE users SET "isSuperAdmin" = 1 WHERE email = $1 RETURNING name',
+            [email]
+        );
+        
         if (res.rows.length > 0) {
-            console.log(`✓ ${email} has been promoted to Super Admin`);
-            console.log(res.rows[0]);
+            console.log(`SUCCESS: ${res.rows[0].name} is now a Super Admin!`);
         } else {
-            console.log(`✗ User ${email} not found`);
+            console.error(`ERROR: User with email ${email} not found.`);
         }
     } catch (err) {
-        console.error('Error:', err);
+        console.error('Promotion Error:', err);
     } finally {
         await db.end();
     }
 }
 
-const email = process.argv[2] || 'admin@example.com';
-promoteSuperAdmin(email);
+const targetEmail = process.argv[2] || 'admin@example.com';
+promote(targetEmail);

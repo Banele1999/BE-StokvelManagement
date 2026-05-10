@@ -61,8 +61,8 @@ async function initDb() {
         )`);
         await db.query(`CREATE TABLE IF NOT EXISTS stokvel_groups (id SERIAL PRIMARY KEY, name TEXT UNIQUE, description TEXT, "groupBalance" DECIMAL DEFAULT 0, "monthlyTarget" DECIMAL DEFAULT 0, "yearlyTarget" DECIMAL DEFAULT 0, "createdAt" TEXT)`);
         await db.query(`CREATE TABLE IF NOT EXISTS group_members ("groupId" INTEGER, "userId" INTEGER, role TEXT DEFAULT 'Member', PRIMARY KEY("groupId", "userId"), FOREIGN KEY("groupId") REFERENCES stokvel_groups(id), FOREIGN KEY("userId") REFERENCES users(id))`);
-        await db.query(`CREATE TABLE IF NOT EXISTS payments (id SERIAL PRIMARY KEY, "userId" INTEGER, "groupId" INTEGER, amount DECIMAL, method TEXT, date TEXT, status TEXT DEFAULT 'pending', reference TEXT, "createdAt" TEXT, FOREIGN KEY("userId") REFERENCES users(id), FOREIGN KEY("groupId") REFERENCES stokvel_groups(id))`);
-        await db.query(`CREATE TABLE IF NOT EXISTS notifications (id SERIAL PRIMARY KEY, "userId" INTEGER, title TEXT, message TEXT, type TEXT DEFAULT 'info', "isRead" INTEGER DEFAULT 0, "createdAt" TEXT, FOREIGN KEY("userId") REFERENCES users(id))`);
+        await db.query(`CREATE TABLE IF NOT EXISTS payments (id SERIAL PRIMARY KEY, "userId" INTEGER, "groupId" INTEGER, amount DECIMAL, method TEXT, date TEXT, status TEXT DEFAULT 'pending', reference TEXT, "createdAt" TEXT)`);
+        await db.query(`CREATE TABLE IF NOT EXISTS notifications (id SERIAL PRIMARY KEY, "userId" INTEGER, title TEXT, message TEXT, type TEXT DEFAULT 'info', "isRead" INTEGER DEFAULT 0, "createdAt" TEXT)`);
         console.log('Database initialized.');
     } catch (err) { console.error('DB Init Error:', err); }
 }

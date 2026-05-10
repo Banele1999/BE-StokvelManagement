@@ -1,7 +1,9 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const jwt = require('jsonwebtoken');
-
 const SECRET_KEY = process.env.JWT_SECRET || 'lokoforyou-super-secret-key';
 
-const token = jwt.sign({ userId: 1, email: 'testadmin@test.com' }, SECRET_KEY, { expiresIn: '24h' });
-console.log('Generated Token:', token);
+const payload = { id: 1, name: 'TestAdmin' };
+const token = jwt.sign(payload, SECRET_KEY);
+console.log("Using Secret:", SECRET_KEY);
+console.log(token);

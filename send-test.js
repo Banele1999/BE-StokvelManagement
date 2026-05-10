@@ -1,24 +1,27 @@
-require('dotenv').config();
-const OpenAI = require('openai').default;
+const http = require('http');
 
-const client = new OpenAI({
-    apiKey: process.env.OPENROUTER_API_KEY,
-    baseURL: 'https://openrouter.ai/api/v1',
+const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwibmFtZSI6IlRlc3RBZG1pbiIsImlhdCI6MTc3ODI1MzkzOH0.0zU-XnADa8z2Lnbvb93IqaL-r2fLLcob82Dq_JoU2tI";
+const postData = JSON.stringify({ message: "test" });
+
+const req = http.request({
+    hostname: 'localhost',
+    port: 3000,
+    path: '/api/chat',
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'Content-Length': Buffer.byteLength(postData)
+    }
+}, (res) => {
+    let data = '';
+    res.on('data', (chunk) => data += chunk);
+    res.on('end', () => {
+        console.log("Status:", res.statusCode);
+        console.log("Body:", data);
+    });
 });
 
-async function chat() {
-    try {
-        const response = await client.chat.completions.create({
-            model: 'gpt-4-turbo',
-            messages: [
-                { role: 'user', content: 'What is Stokvel?' }
-            ],
-            max_tokens: 150,
-        });
-        console.log('Response:', response.choices[0].message.content);
-    } catch (error) {
-        console.error('Error:', error.message);
-    }
-}
-
-chat();
+req.on('error', (e) => console.error(e));
+req.write(postData);
+req.end();

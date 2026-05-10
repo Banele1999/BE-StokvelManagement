@@ -1,15 +1,16 @@
 {
-  "name": "be-stokvelmanagemant",
+  "name": "be-stokvelmanagement",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Stokvel Management Backend",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "seed": "node seed.js",
+    "seed-pg": "node seed-postgres.js"
   },
-  "keywords": [],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
     "@openrouter/sdk": "^0.12.35",
     "bcryptjs": "^3.0.3",
@@ -19,8 +20,8 @@
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.1.1",
-    "openai": "^6.3.0",
-    "pg": "^8.11.3",
+    "openai": "^6.37.0",
+    "pg": "^8.11.6",
     "sqlite3": "^6.0.1"
   },
   "devDependencies": {
