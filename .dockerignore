@@ -3,6 +3,3 @@ npm-debug.log
 .env
 db/*.sqlite
 .git
-.angular
-dist
-.vscode
